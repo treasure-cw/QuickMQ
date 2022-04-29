@@ -63,7 +63,7 @@ public class PartitionController implements Partition{
         isLeader = leader;
     }
 
-    public void setLastEndOffset(Integer lastEndOffset) {
+    public synchronized void setLastEndOffset(Integer lastEndOffset) {
         this.lastEndOffset = lastEndOffset;
     }
 
@@ -75,7 +75,7 @@ public class PartitionController implements Partition{
         this.serverSocket = serverSocket;
     }
 
-    public synchronized void addLastRndOffset(){
+    public synchronized void addLastEndOffset(){
         this.setLastEndOffset(this.getLastEndOffset() + 1);
     }
 

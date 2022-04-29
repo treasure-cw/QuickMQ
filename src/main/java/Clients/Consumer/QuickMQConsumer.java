@@ -68,11 +68,16 @@ public class QuickMQConsumer<K,V> implements Consumer{
         try {
             // get consumer socket client form socket pool by definite partition
             Socket consumerClient = this.getTopicSocketConnectPool().getPartitionSockets().get(partition);
-            // build the output steam(ObjectOutputSteam)
-            ObjectOutputStream outputStream = new ObjectOutputStream(consumerClient.getOutputStream());
+            if(consumerClient == null){
+                throw new IllegalStateException("");
+            }
             // build or get input steam(ObjectInputSteam)
             ObjectInputStream objectInputStream = SteamController.getObjectInputSteamByInputSteam(consumerClient.getInputStream());
-
+            if(objectInputStream == null){
+                throw new IllegalStateException("");
+            }
+            // build the output steam(ObjectOutputSteam)
+            ObjectOutputStream outputStream = new ObjectOutputStream(consumerClient.getOutputStream());
             // get pullTag from common function area
             Integer tag = CommonFunction.getPullConsumerRecordQuery();
             // get Offset's offset

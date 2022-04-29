@@ -38,102 +38,122 @@ public class PartitionExecuter implements Runnable{
         return partitionController;
     }
 
+    public void renewHighWater(int a){
+
+    }
+    /**
+     * function to receive request and resolve it
+     */
     @Override
     public void run() {
+        // get base path
         String basePath = CommonFunction.getBasicFilePath();
+        // get base file type
         String baseType = CommonFunction.getTextFileType();
+        // build path
         String path = basePath
                 + this.getPartitionController().getTopic()
                 + "_"
                 + this.getPartitionController().getPartition().toString()
                 + baseType;
+        //try statement
         try {
+            // get inputSteam from socket
             InputStream inputStream = this.getSocket().getInputStream();
+            // get outputSteam from socket
             OutputStream outputStream = this.getSocket().getOutputStream();
 
+            // get fileInputSteam from SteamController by path
             FileInputStream fileInputStream = SteamController.getFileInputByPath(path);
+            // get fileOutputSteam from SteamController by path
             FileOutputStream fileOutputStream = SteamController.getFileOutputByPath(path);
+
             //read from stream
             //write to file
+            ObjectInputStream objectInputStreamFromFile = SteamController.getObjectInputByFileInputSteam(fileInputStream);
             ObjectInputStream objectInputStreamFromSteam = new ObjectInputStream(inputStream);
-            ObjectOutputStream objectOutputStreamToFile = SteamController.getObjectOutputByFileOutputSteam(fileOutputStream);
             //read from file
             //write to steam
-            ObjectInputStream objectInputStreamFromFile = SteamController.getObjectInputByFileInputSteam(fileInputStream);
+            ObjectOutputStream objectOutputStreamToFile = SteamController.getObjectOutputByFileOutputSteam(fileOutputStream);
             ObjectOutputStream objectOutputStreamToSteam = new ObjectOutputStream(outputStream);
 
             //noinspection InfiniteLoopStatement
             while(true) {
+                // request type tag
                 Integer tagNum;
                 while (true) {
                     try {
+                        // get tag
                         tagNum = (Integer) objectInputStreamFromSteam.readObject();
                         break;
                     } catch (Exception e) {
                         Thread.sleep(1000);
                     }
                 }
-                String info = Objects.equals(tagNum, CommonFunction.getPushProducerRecordQuery()) ? "producer push query" : "consumer pull query";
-                System.out.println(info);
-                //push query type;
+                // push query type;
                 if (Objects.equals(CommonFunction.getPushProducerRecordQuery(), tagNum)) {
+                    // read record from IO
                     ProducerRecord record = (ProducerRecord) objectInputStreamFromSteam.readObject();
+                    // write it into file
                     objectOutputStreamToFile.writeObject(record);
-                    //add partition's offset
-                    this.getPartitionController().addLastRndOffset();
+                    // add partition's offset
+                    this.getPartitionController().addLastEndOffset();
 
+                    // this partition is leader
                     if (this.getPartitionController().getLeader()){
-                        //
+                        // write record to all fellows
                         for(Socket socket : this.getPartitionController().getPartitionFollowerConnectPool().getFollowerSocket()){
                             ObjectOutputStream o = SteamController.getObjectOutputSteamByOutputSteam(socket.getOutputStream());
                             o.writeObject(CommonFunction.getPushProducerRecordQuery());
                             o.writeObject(record);
                         }
-                    } else{
-                        //ack
+                    }
+                    // this partition is fellow
+                    else{
+                        // write ack to leader
                         ObjectOutputStream o = SteamController.getObjectOutputSteamByOutputSteam(
                                 this.getPartitionController().getPartitionFollowerConnectPool().getLeaderSocket().getOutputStream());
                         o.writeObject(CommonFunction.getFollowerAckQuery());
                         o.writeObject(this.getPartitionController().getLastEndOffset());
                     }
-//                    Jedis redis = null;
-//                    for (int i = 0; i < 5; i++) {
-//                        redis = RedisConnectPool.getConnection();
-//                        if(redis != null){
-//                            break;
-//                        }
-//                    }
-//                    if(redis == null){
-//                        throw new IllegalStateException("Redis Connection Exception:Can't get a redis connection.Exception from QuickMQ.Server.PartitionReceiver");
-//
-//                    }else {
-//                        while(1 == RedisOperation.getClock(redis, "test")){
-//                            this.addAbstractSize();
-//                        }
-//                        RedisOperation.releaseLock(redis, "test");
-//                        RedisConnectPool.releaseConnection(redis);
-//                    }
                 }
                 //pull query type
                 else if (Objects.equals(CommonFunction.getPullConsumerRecordQuery(), tagNum)) {
+                    // get offset
                     Integer offsetNum = (Integer) objectInputStreamFromSteam.readObject();
-                    if (offsetNum < this.getPartitionController().getHighWater()) {
-                        ProducerRecord record = (ProducerRecord) objectInputStreamFromFile.readObject();
-                        objectOutputStreamToSteam.writeObject(record);
-                    } else {
-                        throw new IllegalStateException("QuickMQ Server Exception:The pull query's offset is bigger than server's HW QuickMQ.Server.PartitionReceiver.Exception from QuickMQ.Server.PartitionReceiver");
+                    // this request is redis keep alive request
+                    if(offsetNum == -1){
+                        Integer aliveTag = 1;
+                        // tell redis i'm alive
+                        objectOutputStreamToSteam.writeObject(aliveTag);
+                    }
+                    // this request is pull request
+                    else {
+                        // if offset less than highWater
+                        if (offsetNum < this.getPartitionController().getHighWater()) {
+                            // read record from file
+                            ProducerRecord record = (ProducerRecord) objectInputStreamFromFile.readObject();
+                            // write record to consumer
+                            objectOutputStreamToSteam.writeObject(record);
+                        } else {
+                            throw new IllegalStateException("QuickMQ Server Exception:The pull query's offset is bigger than server's HW QuickMQ.Server.PartitionReceiver.Exception from QuickMQ.Server.PartitionReceiver");
+                        }
                     }
                 }
+                // ack type
                 else if (Objects.equals(CommonFunction.getFollowerAckQuery(), tagNum)) {
                     Integer lastEndOffsetNum = (Integer) objectInputStreamFromSteam.readObject();
+                    this.renewHighWater(lastEndOffsetNum);
                 }
                 //exception
                 else {
                     throw new IllegalStateException("QuickMQ Server Exception:Can't recognize the type of query.Exception from QuickMQ.Server.PartitionReceiver");
                 }
+                // wait IO Steam
                 while(inputStream.available()==0){
                     Thread.sleep(10);
                 }
+                // skip Object head
                 if(inputStream.available()>0){
                     inputStream.skip(4);
                 }

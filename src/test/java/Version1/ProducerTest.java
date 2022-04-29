@@ -8,16 +8,18 @@ import Common.ConfigMaker;
 import java.util.Properties;
 
 public class ProducerTest {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         Properties properties=new Properties();
         properties.put("IP","127.0.0.1");
         properties.put("PORT",1234);
-        properties.put("TOPIC","WANG");
+        properties.put("TOPIC","Test");
         ConfigMaker configMaker=new ConfigMaker(properties);
         Producer producer=new QuickMQProducer(configMaker);
-        ProducerRecord<String,String> producerRecord= new ProducerRecord<String,String>("WANG", 0, "TEST", "HELLO_WORLD", 0L);
-        ProducerRecord<String,String> producerRecord1= new ProducerRecord<String,String>("WANG", 0, "TEST", "HELLO_WORLD1", 0L);
+        ProducerRecord<String,String> producerRecord= new ProducerRecord<String,String>("Test", 0, "TestKey", "Hello QuickMQ", 0L);
         producer.send(producerRecord);
-        producer.send(producerRecord1);
+        producer.send(producerRecord);
+        producer.send(producerRecord);
+        Thread.sleep(5000);
+        producer.send(producerRecord);
     }
 }

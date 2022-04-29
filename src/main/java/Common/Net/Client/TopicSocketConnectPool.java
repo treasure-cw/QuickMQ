@@ -85,7 +85,7 @@ public class TopicSocketConnectPool implements SocketConnectPool {
             // partition alive condition
             if (isA) {
                 // can't find socket in socket pool or this socket is disabled
-                if (this.getPartitionSockets().get(partitions.get(index)) == null || this.getPartitionSockets().get(partitions.get(index)).isClosed()) {
+                if (this.getPartitionSockets().get(partitions.get(index)) == null || !this.getPartitionSockets().get(partitions.get(index)).isConnected()) {
                     // remove this socket
                     this.getPartitionSockets().remove(partitions.get(index));
                     // try statement

@@ -1,5 +1,7 @@
 package Common;
 
+import org.jetbrains.annotations.NotNull;
+
 /**
  * @author wangchen
  * @version 1.0.0
@@ -15,7 +17,7 @@ public class OffSet {
      * @param partition number of partition that consumer will pull from
      * @param offSet number of offset that consumer will pull at
      */
-    public OffSet(String topic, Integer partition, Integer offSet) {
+    public OffSet(@NotNull String topic, @NotNull Integer partition, Integer offSet) {
         this.topic = topic;
         this.partition = partition;
         this.offSet = offSet;
